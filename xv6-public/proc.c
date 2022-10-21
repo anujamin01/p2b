@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
 
 struct {
   struct spinlock lock;
@@ -88,7 +89,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->priority = 1;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -311,6 +312,27 @@ wait(void)
   }
 }
 
+void iterate_ptable(void){
+  struct proc *p;
+  //struct pstat *pstate;
+  struct cpu *c = mycpu();
+  int i = 0;
+  c->proc = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      // set inuse
+      if (p->state != UNUSED){ // perhaps needs to be running 
+        pstate.inuse[i] = 1;
+      } else{
+        pstate.inuse[i] = 0;
+      }
+      pstate.tickets[i] = p->priority;
+      pstate.pid[i] = p->pid;
+      pstate.ticks[i] = p->run_ticks;
+      i++;
+      }
+  //return pstate;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -335,21 +357,43 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-
+      if (p->priority == 1){
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-
+      p->run_ticks++;
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
+      } else{ // priority is 0
+        continue;
+      }
     }
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      if (p->priority == 0){ // look into second priority
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      p->run_ticks++;
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      }
+    }    
     release(&ptable.lock);
 
   }
