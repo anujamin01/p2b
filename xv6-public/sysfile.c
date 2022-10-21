@@ -15,7 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
-
+#include "pstat.h"
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -441,4 +441,61 @@ sys_pipe(void)
   fd[0] = fd0;
   fd[1] = fd1;
   return 0;
+}
+
+int sys_settickets(void){
+  struct proc* curproc = myproc();
+  int ticket;
+  if(argint(0, &ticket) < 0) // grab 1st arg
+    return -1;
+  
+  if (ticket < 0 || ticket > 1){
+    return -1;
+  }
+  if (ticket == 0){
+    curproc->priority = 0;
+  }
+  if (ticket == 1){
+    curproc->priority = 1;
+  }
+  return 0;
+
+  /*sets the number of tickets of the calling process. By default, each process should get one ticket; calling this routine makes it such that a process can raise the number of tickets it receives, and thus receive a higher proportion of CPU cycles. This routine should return 0 if successful, and -1 otherwise (if, for example, the caller passes in a number less than one)*/
+}
+
+int sys_getpinfo(struct pstat *){
+  struct pstat* currentState;
+  if(argptr(0, (void*)&currentState,sizeof(*currentState)) < 0)
+    return -1;
+  struct pstat* pstate = iterate_ptable();
+  for(int i = 0; i < NPROC; i++){
+   currentState->inuse[i] = pstate->inuse[i];
+   currentState->pid[i] = pstate->pid[i];
+   currentState->tickets[i] = pstate->tickets[i];
+   currentState->ticks[i] = pstate->ticks[i];
+  }
+  
+
+/*returns some information about all running processes, including how many times each has been chosen to run and the process ID of each. You can use this system call to build a variant of the command line program ps, which can then be called to see what is going on. The structure pstat is defined below; note, you cannot change this structure, and must use it exactly as is. This routine should return 0 if successful, and -1 otherwise*/
+
+  return 0;
+}
+
+int sys_mprotect(void){
+  void* addr; // pointer to the address
+  if(argptr(0, (void*)&addr,sizeof(*addr)) < 0) // if invalid pointer return -1;
+    return -1;
+  int len;
+  if(argint(1, &len) < 0) // if invalid arg
+    return -1;
+  return mprotect(addr,len);
+}
+extern int sys_munprotect(void){
+  void* addr; // pointer to the address
+  if(argptr(0, (void*)&addr,sizeof(*addr)) < 0) // if invalid pointer return -1;
+    return -1;
+  int len;
+  if(argint(1, &len) < 0) // if invalid arg
+    return -1;
+  return munprotect(addr,len);
 }

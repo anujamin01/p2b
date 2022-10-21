@@ -8,6 +8,8 @@
 #include "spinlock.h"
 #include "pstat.h"
 
+struct pstat *pstate;
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -312,25 +314,24 @@ wait(void)
   }
 }
 
-void iterate_ptable(void){
+struct pstat* iterate_ptable(void){
   struct proc *p;
-  //struct pstat *pstate;
   struct cpu *c = mycpu();
   int i = 0;
   c->proc = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       // set inuse
       if (p->state != UNUSED){ // perhaps needs to be running 
-        pstate.inuse[i] = 1;
+        pstate->inuse[i] = 1;
       } else{
-        pstate.inuse[i] = 0;
+        pstate->inuse[i] = 0;
       }
-      pstate.tickets[i] = p->priority;
-      pstate.pid[i] = p->pid;
-      pstate.ticks[i] = p->run_ticks;
+      pstate->tickets[i] = p->priority;
+      pstate->pid[i] = p->pid;
+      pstate->ticks[i] = p->run_ticks;
       i++;
       }
-  //return pstate;
+  return pstate;
 }
 
 //PAGEBREAK: 42

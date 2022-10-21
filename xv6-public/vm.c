@@ -391,4 +391,48 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 // Blank page.
 //PAGEBREAK!
 // Blank page.
+int mprotect(void *addr,int len){
 
+  if (len < 1) // if length is invalid
+    return -1;
+
+  struct proc* curproc = myproc();
+  for(int i = 0; i < len; i++){
+    char* aligned = uva2ka(curproc->pgdir, addr);
+    if (aligned == 0){
+      return -1;
+    } 
+    addr+=PGSIZE;
+  }  
+  // char* uva2ka(pde_t *pgdir, char *uva)
+  // iterate through page table & set the address to read only
+  for(int i = 0; i < len; i++){
+    pte_t* x = walkpgdir(curproc->pgdir,addr,0);
+    *x = *x & ~PTE_W; // set the bit to be read only
+    addr += PGSIZE; // move to next page 
+  }
+  lcr3(V2P(curproc->pgdir));
+  return 0;
+}
+
+int munprotect(void *addr,int len){
+  if (len < 1) // if length is invalid
+    return -1;
+
+  struct proc* curproc = myproc();
+  for(int i = 0; i < len; i++){
+    char* aligned = uva2ka(curproc->pgdir, addr);
+    if (aligned == 0){
+      return -1;
+    } 
+    addr+=PGSIZE;
+  }  
+  // iterate through page table & set the address to read only
+  for(int i = 0; i < len; i++){
+    pte_t* x = walkpgdir(curproc->pgdir,addr,0);
+    *x = *x | PTE_W; // set the bit to be readable & writable
+    addr += PGSIZE; // move to next page 
+  }
+  lcr3(V2P(curproc->pgdir));
+  return 0;
+}
