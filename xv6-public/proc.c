@@ -92,6 +92,7 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
   p->priority = 1;
+  p->run_ticks=0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -316,9 +317,9 @@ wait(void)
 
 struct pstat* iterate_ptable(void){
   struct proc *p;
-  struct cpu *c = mycpu();
+  //struct cpu *c = mycpu();
   int i = 0;
-  c->proc = 0;
+  //c->proc = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       // set inuse
       if (p->state != UNUSED){ // perhaps needs to be running 
