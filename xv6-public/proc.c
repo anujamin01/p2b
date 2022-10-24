@@ -317,6 +317,7 @@ wait(void)
 
 struct pstat* iterate_ptable(void){
   struct proc *p;
+  acquire(&ptable.lock);
   //struct cpu *c = mycpu();
   int i = 0;
   //c->proc = 0;
@@ -373,9 +374,7 @@ scheduler(void)
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
-      } else{ // priority is 0
-        continue;
-      }
+      } 
     }
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
