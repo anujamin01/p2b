@@ -399,10 +399,10 @@ int mprotect(void *addr,int len){
   struct proc* curproc = myproc();
   for(int i = 0; i < len; i++){
     char* aligned = uva2ka(curproc->pgdir, addr);
-    if (aligned == 0){
+    if ((int)aligned % PGSIZE != 0){
       return -1;
     } 
-    addr+=PGSIZE;
+    //addr+=PGSIZE;
   }  
   // char* uva2ka(pde_t *pgdir, char *uva)
   // iterate through page table & set the address to read only
@@ -430,10 +430,10 @@ int munprotect(void *addr,int len){
   struct proc* curproc = myproc();
   for(int i = 0; i < len; i++){
     char* aligned = uva2ka(curproc->pgdir, addr);
-    if (aligned == 0){
+    if ((int)aligned % PGSIZE != 0){
       return -1;
     } 
-    addr+=PGSIZE;
+    //addr+=PGSIZE;
   }  
   // iterate through page table & set the address to read only
   for(int i = 0; i < len; i++){
