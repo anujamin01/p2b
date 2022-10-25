@@ -121,7 +121,10 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-struct pstat*   iterate_ptable(void);
+int             settickets(int);
+int             getpinfo(struct pstat *);
+int             getHighPriority(void);
+//struct pstat*   iterate_ptable(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

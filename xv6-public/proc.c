@@ -8,7 +8,7 @@
 #include "spinlock.h"
 #include "pstat.h"
 
-struct pstat *pstate;
+//struct pstat *pstate;
 
 struct {
   struct spinlock lock;
@@ -200,10 +200,11 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  np->run_ticks = 0;
+  np->priority = curproc->priority;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -314,28 +315,66 @@ wait(void)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
 }
+int settickets(int ticket){
+  if (ticket < 0 || ticket > 1){
+    return -1;
+  }
+  struct proc *currproc = myproc();
+  acquire(&ptable.lock);
+  if (ticket == 0){
+    currproc->priority = 0;
+  }
+  if (ticket == 1){
+    currproc->priority = 1;
+  }
+  release(&ptable.lock);
+  return 0;
+}
+int getpinfo(struct pstat *currentState){
 
-struct pstat* iterate_ptable(void){
+  //pstate = iterate_ptable();
   struct proc *p;
   acquire(&ptable.lock);
   //struct cpu *c = mycpu();
   int i = 0;
   //c->proc = 0;
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      // set inuse
-      if (p->state != UNUSED){ // perhaps needs to be running 
-        pstate->inuse[i] = 1;
-      } else{
-        pstate->inuse[i] = 0;
-      }
-      pstate->tickets[i] = p->priority;
-      pstate->pid[i] = p->pid;
-      pstate->ticks[i] = p->run_ticks;
-      i++;
-      }
-  return pstate;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    // set inuse
+    if (p->state != UNUSED){ // perhaps needs to be running 
+      currentState->inuse[i] = 1;
+    } else{
+      currentState->inuse[i] = 0;
+    }
+    currentState->tickets[i] = p->priority;
+    currentState->pid[i] = p->pid;
+    currentState->ticks[i] = p->run_ticks;
+    i++;
+  }
+  /*
+  for(int i = 0; i < NPROC; i++){
+   currentState->inuse[i] = pstate->inuse[i];
+   currentState->pid[i] = pstate->pid[i];
+   currentState->tickets[i] = pstate->tickets[i];
+   currentState->ticks[i] = pstate->ticks[i];
+  }
+  */
+  release(&ptable.lock);
+  return 0;
 }
+//struct pstat* iterate_ptable(void){
+//  return NULL;
+//}
 
+int getHighPriority(){
+    struct proc* p;
+    int hpcnt = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if (p->state == RUNNABLE && p->priority == 1){
+        hpcnt++;
+      }
+    }
+    return hpcnt;
+}
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -354,47 +393,58 @@ scheduler(void)
   for(;;){
     // Enable interrupts on this processor.
     sti();
-
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-      if (p->priority == 1){
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      p->run_ticks++;
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-      } 
-    }
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-      if (p->priority == 0){ // look into second priority
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      p->run_ticks++;
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+    int hasHP = 0;
+    int hpcnt = getHighPriority();
+    while (hpcnt > 0){
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
+        if (p->priority == 1){
+          hasHP = 1;
+          // Switch to chosen process.  It is the process's job
+          // to release ptable.lock and then reacquire it
+          // before jumping back to us.
+          c->proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
+          p->run_ticks++;
+          swtch(&(c->scheduler), p->context);
+          switchkvm();
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+        } 
       }
-    }    
+      hpcnt = getHighPriority();
+      //if (hpcnt == 0){
+      //  hasHP = 0;
+      //}
+    }
+    // run only 1 low priority job
+    if (hasHP == 0){
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+          if(p->state != RUNNABLE)
+            continue;
+          //if (p->priority == 0){ // look into second priority
+          // Switch to chosen process.  It is the process's job
+          // to release ptable.lock and then reacquire it
+          // before jumping back to us.
+          c->proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
+          p->run_ticks++;
+          swtch(&(c->scheduler), p->context);
+          switchkvm();
+
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+          break;
+          //}
+      }  
+    }  
     release(&ptable.lock);
 
   }

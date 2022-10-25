@@ -132,8 +132,8 @@ static int (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_settickets]   sys_settickets,
 [SYS_getpinfo]   sys_getpinfo,
-[SYS_settickets]   sys_mprotect,
-[SYS_getpinfo]   sys_munprotect
+[SYS_mprotect]   sys_mprotect,
+[SYS_munprotect]   sys_munprotect,
 };
 
 void

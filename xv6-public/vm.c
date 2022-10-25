@@ -322,7 +322,7 @@ copyuvm(pde_t *pgdir, uint sz)
 
   if((d = setupkvm()) == 0)
     return 0;
-  for(i = 0; i < sz; i += PGSIZE){
+  for(i = PGSIZE; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
@@ -408,7 +408,15 @@ int mprotect(void *addr,int len){
   // iterate through page table & set the address to read only
   for(int i = 0; i < len; i++){
     pte_t* x = walkpgdir(curproc->pgdir,addr,0);
-    *x = *x & ~PTE_W; // set the bit to be read only
+    if (x){
+      // check if user bit not set & present bit not set
+      if (((*x & PTE_P) != 0) && ((*x & PTE_U) != 0))
+        *x = *x & ~PTE_W; // set the bit to be read only
+      else
+        return -1;
+    } else {
+      return -1;
+    }
     addr += PGSIZE; // move to next page 
   }
   lcr3(V2P(curproc->pgdir));
@@ -430,7 +438,15 @@ int munprotect(void *addr,int len){
   // iterate through page table & set the address to read only
   for(int i = 0; i < len; i++){
     pte_t* x = walkpgdir(curproc->pgdir,addr,0);
-    *x = *x | PTE_W; // set the bit to be readable & writable
+    if (x){
+      // check if user bit not set & present bit not set
+      if (((*x & PTE_P) != 0) && ((*x & PTE_U) != 0))
+        *x = *x | PTE_W; // set the bit to be readable & writable
+      else
+        return -1;
+    } else{
+      return -1;
+    }
     addr += PGSIZE; // move to next page 
   }
   lcr3(V2P(curproc->pgdir));
